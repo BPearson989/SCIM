@@ -1,58 +1,74 @@
 # SCIM
 
-What the program does
+## What the program does
 
-Axes:
+The `scim.py` script simulates (or ingests) competency events across grades,
+competencies, and sub-points, then produces:
 
-X = Grades G1–G9 (back→front)
+* Monthly cumulative 3‑D voxel snapshots that highlight every
+  grade/competency/sub-point combination satisfied to date.
+* An animated GIF that stitches the monthly voxel images into a quick
+  progression reel.
+* A line chart showing the monthly average grade index per competency and the
+  overall average.
+* A CSV export of the underlying events for further analysis.
 
-Y = Competencies = Tech Knowledge, Mentoring, Business, Growth
+Axes follow the convention described in the prompt:
 
-Z = Sub-points S1–S5 (≥5 satisfied)
+* **X** — Grades `G1` → `G9` (rendered back to front to ease depth perception)
+* **Y** — Competencies: Tech Knowledge, Mentoring, Business, Growth
+* **Z** — Sub-points `S1` → `S5`
 
-Simulation: 50 entries, timestamps spread over 12 months, with an upward grade trend and increasing sub-point hits as months progress.
+The default simulation generates 50 entries across 12 months with an upward
+trend in grade index and sub-point coverage.
 
-Progression views:
+## Running the script
 
-Cumulative 3-D voxel cube per month (snapshots + animated GIF).
+Install dependencies (preferably inside a virtual environment). The optional
+`imageio` package enables GIF creation; without it the script will still render
+all PNG charts but skip the animation.
 
-Line charts: monthly average grade index per competency and overall.
+```bash
+pip install -r requirements.txt
+```
 
-Data: raw simulated entries saved to CSV.
+Generate the visualizations with deterministic output:
 
-How to tweak
+```bash
+python scim.py --seed 7
+```
 
-Inside the script you can change:
+Results are written to the `output/` directory:
 
-n_entries = 50         # number of input records
-months = 12            # tracking window
-trend_strength = 0.35  # increase for faster improvement over time
+* `voxels_YYYY_MM.png` — Monthly voxel snapshots
+* `voxel_progress.gif` — Animated GIF of the snapshots
+* `competency_trends.png` — Line chart of monthly average grades
+* `entries.csv` — Raw events used for the charts
 
-grades = [f"G{i}" for i in range(1, 10)]
-competencies = ["Tech Knowledge", "Mentoring", "Business", "Growth"]
-subpoints = [f"S{i}" for i in range(1, 6)]
+### Tweaking the simulation
 
+The following CLI options control the synthetic data:
 
-You can also plug in real user entries (date, competency, subpoint, grade) by loading a CSV instead of simulation and all plots/GIFs will regenerate.
+* `--entries` — Number of simulated records (default: 50)
+* `--months` — Tracking window in months (default: 12)
+* `--trend-strength` — How quickly grades trend upward (default: 0.35)
+* `--seed` — Random seed for reproducibility
 
-Steps (so you can re-run elsewhere)
+### Using your own CSV
 
-Generate/supply entries with (timestamp, competency, subpoint, grade_idx).
+Provide a CSV with columns `timestamp`, `competency`, `subpoint`, and either
+`grade` (e.g. `G4`) or `grade_idx` (0-based index). Then run:
 
-Aggregate by month → compute avg grade per competency and overall.
+```bash
+python scim.py --input my_entries.csv
+```
 
-Build cumulative voxel grid per month → export snapshots & GIF.
+All plots and exports will be regenerated from the supplied data.
 
-Plot line charts per competency + overall.
+## Implementation notes
 
-Assumptions
-
-Grades are treated as indices 0..8 (displayed as G1..G9).
-
-Progression charts use monthly average grade (you could switch to max or median easily).
-
-Risks / notes
-
-Occlusion: Dense front-layer voxels can hide back layers. The GIF helps by showing cumulative growth over time.
-
-Sampling bias: If some months have too few entries, averages can wobble. The program weights by actual hits.
+* Grades are treated as indices `0..8` internally (`G1..G9` for display).
+* Monthly averages use arithmetic mean. Switch to median/max by adjusting
+  `plot_competency_trends`.
+* Dense front-layer voxels can obscure back layers; consult the generated GIF
+  for temporal context.
