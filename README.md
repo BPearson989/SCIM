@@ -42,6 +42,7 @@ Results are written to the `output/` directory:
 
 * `voxels_YYYY_MM.png` — Monthly voxel snapshots
 * `voxel_progress.gif` — Animated GIF of the snapshots
+* `voxel_timeline.png` — Contact sheet showing the monthly snapshots together
 * `competency_trends.png` — Line chart of monthly average grades
 * `entries.csv` — Raw events used for the charts
 
