@@ -274,14 +274,49 @@ def _add_reference_grid(ax: matplotlib.axes.Axes) -> None:
         ax.plot([0, len(GRADES)], [0, 0], [z, z], color="#d0d0d0", linewidth=0.5, alpha=0.5)
 
 
-def render_voxel_progression(snapshots: Sequence[Tuple[pd.Timestamp, np.ndarray]], output_dir: Path) -> List[Path]:
-    image_paths: List[Path] = []
+def render_voxel_progression(
+    snapshots: Sequence[Tuple[pd.Timestamp, np.ndarray]], output_dir: Path
+) -> List[Tuple[pd.Timestamp, Path]]:
+    rendered: List[Tuple[pd.Timestamp, Path]] = []
     for timestamp, voxels in snapshots:
         title = timestamp.strftime("Early profile (%b %Y)")
         path = output_dir / f"voxels_{timestamp.strftime('%Y_%m')}.png"
         render_voxel_snapshot(voxels, title, path)
-        image_paths.append(path)
-    return image_paths
+        rendered.append((timestamp, path))
+    return rendered
+
+
+def create_voxel_timeline(
+    frames: Sequence[Tuple[pd.Timestamp, Path]],
+    output_path: Path,
+    columns: int = 4,
+) -> None:
+    """Combine individual voxel snapshots into a single timeline image."""
+
+    if not frames:
+        return
+
+    columns = max(1, int(columns))
+    rows = int(np.ceil(len(frames) / columns))
+
+    fig, axes = plt.subplots(rows, columns, figsize=(columns * 3.6, rows * 3.6))
+    axes_array = np.atleast_1d(axes).ravel()
+
+    for idx, ax in enumerate(axes_array):
+        if idx >= len(frames):
+            ax.axis("off")
+            continue
+
+        timestamp, frame_path = frames[idx]
+        image = plt.imread(frame_path)
+        ax.imshow(image)
+        ax.set_title(timestamp.strftime("%b %Y"))
+        ax.axis("off")
+
+    fig.subplots_adjust(wspace=0.05, hspace=0.2, top=0.88)
+    fig.suptitle("Voxel progression timeline", fontsize=16, y=0.98)
+    fig.savefig(output_path, dpi=180)
+    plt.close(fig)
 
 
 def create_progress_gif(frames: Sequence[Path], output_path: Path, duration: float = 0.8) -> None:
@@ -304,7 +339,11 @@ def plot_competency_trends(df: pd.DataFrame, output_path: Path) -> None:
     overall = df.groupby("month")["grade_idx"].mean()
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    months = monthly.index.to_timestamp()
+    index = monthly.index
+    if isinstance(index, pd.PeriodIndex):
+        months = index.to_timestamp()
+    else:
+        months = pd.to_datetime(index)
     for competency in COMPETENCIES:
         ax.plot(months, monthly[competency], marker="o", label=competency)
     ax.plot(months, overall, marker="o", linestyle="--", color="black", label="Overall avg")
@@ -344,15 +383,18 @@ def main() -> None:
 
     prepared = prepare_month_columns(entries)
     snapshots = build_monthly_voxels(prepared)
-    frame_paths = render_voxel_progression(snapshots, output_dir)
-    if frame_paths:
-        create_progress_gif(frame_paths, output_dir / "voxel_progress.gif")
+    frame_info = render_voxel_progression(snapshots, output_dir)
+    if frame_info:
+        create_progress_gif([path for _, path in frame_info], output_dir / "voxel_progress.gif")
+        create_voxel_timeline(frame_info, output_dir / "voxel_timeline.png")
 
     plot_competency_trends(prepared, output_dir / "competency_trends.png")
     export_entries(prepared, output_dir / "entries.csv")
 
-    print(f"Generated {len(frame_paths)} voxel snapshots in {output_dir}")
+    print(f"Generated {len(frame_info)} voxel snapshots in {output_dir}")
     print(f"Saved animated GIF to {output_dir / 'voxel_progress.gif'}")
+    if frame_info:
+        print(f"Saved voxel timeline to {output_dir / 'voxel_timeline.png'}")
     print(f"Saved competency trend chart to {output_dir / 'competency_trends.png'}")
     print(f"Saved raw entries to {output_dir / 'entries.csv'}")
 
